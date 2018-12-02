@@ -1,0 +1,82 @@
+{
+  Create a new Leveled Items List LVLI record from selected records
+}
+unit CreateNewLVLI;
+
+const
+  sNewEditorID = 'LLNew'; // new default Editor ID for LVLI
+
+var
+  ll: IInterface;
+
+function Process(e: IInterface): Integer;
+var
+  f, g, entries, entry: IInterface;
+  edid: WideString;
+begin
+  // LVLI is not created yet
+  if not Assigned(ll) then begin
+    
+    // ask for new Editor ID and abort if cancelled
+    edid := sNewEditorID;
+    if not InputQuery('Enter', 'New Leveled List Editor ID', edid) then begin
+      Result := 1;
+      Exit;
+    end;
+
+    // creating new plugin or using the same one
+    if MessageDlg('Create a new plugin [YES] or add LL in the same one [NO]?', mtConfirmation, [mbYes, mbNo], 0) = mrNo then
+      f := GetFile(e)
+    else begin
+      f := AddNewFile;
+      // abort if user cancelled
+      if not Assigned(f) then begin
+        Result := 1;
+        Exit;
+      end;
+    end;
+    
+    // adding LVLI group if missing
+    if not HasGroup(f, 'LVLI') then
+      g := Add(f, 'LVLI', True)
+    else
+      g := GroupBySignature(f, 'LVLI');
+      
+    // adding new LVLI record
+    ll := Add(g, 'LVLI', True);
+    
+    // setting Editor ID and other LL fields if needed
+    SetElementEditValues(ll, 'EDID', edid);
+    // Flags: Calculate from all levels <= player's level, Calculate for each item in count
+    SetElementNativeValues(ll, 'LVLF', 3);
+    //SetElementNativeValues(ll, 'LVLD', 50); // Chance None
+  end;
+  
+  // add masters for the current selected record
+  AddRequiredElementMasters(e, GetFile(ll), False);
+
+  // getting the list of leveled entries
+  entries := ElementByName(ll, 'Leveled List Entries');
+  
+  // if doesn't exist yet, then add it
+  if not Assigned(entries) then begin
+    entries := Add(ll, 'Leveled List Entries', True);
+    // when new array is created in xEdit one empty element is added automatically which we are going to use
+    entry := ElementByIndex(entries, 0);
+  end else
+    // append a new entry to the existing list
+    entry := ElementAssign(entries, HighInteger, nil, False);
+
+  // setting entry fields
+  SetElementEditValues(entry, 'LVLO\Reference', Name(e));
+  SetElementNativeValues(entry, 'LVLO\Level', 1);
+  SetElementNativeValues(entry, 'LVLO\Count', 1);
+end;
+
+function Finalize: Integer;
+begin
+  if Assigned(ll) then
+    AddMessage('Created new leveled list: ' + Name(ll));
+end;
+
+end.
